@@ -20,6 +20,7 @@ export default function QRScanner({ onResult }) {
 
         const reader = new BrowserMultiFormatReader();
         let cancelled = false;
+        let controlsRef = null;
 
         console.log('🔵 Iniciando scanner...');
 
@@ -36,7 +37,7 @@ export default function QRScanner({ onResult }) {
                 setStatus("Escaneando…");
                 console.log('🔵 Iniciando decodificación desde cámara...');
 
-                await reader.decodeFromVideoDevice(
+                controlsRef = await reader.decodeFromVideoDevice(
                     devices[0].deviceId,
                     videoRef.current,
                     (result, err) => {
@@ -62,7 +63,23 @@ export default function QRScanner({ onResult }) {
         return () => {
             console.log('🔴 QRScanner cleanup ejecutándose');
             cancelled = true;
-            reader.reset();
+
+            // Detener el stream de video
+            if (videoRef.current && videoRef.current.srcObject) {
+                const stream = videoRef.current.srcObject;
+                const tracks = stream.getTracks();
+                tracks.forEach(track => {
+                    console.log('🔴 Deteniendo track:', track.kind);
+                    track.stop();
+                });
+                videoRef.current.srcObject = null;
+            }
+
+            // Si el reader tiene método stopContinuousDecode, úsalo
+            if (controlsRef && typeof controlsRef.stop === 'function') {
+                console.log('🔴 Llamando controls.stop()');
+                controlsRef.stop();
+            }
         };
     }, [onResult]);
 
