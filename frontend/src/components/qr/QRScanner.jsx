@@ -1,122 +1,63 @@
-import { useEffect, useRef, useState } from "react";
-import { BrowserMultiFormatReader } from "@zxing/browser";
+import { useEffect, useRef } from "react";
+import { Html5Qrcode } from "html5-qrcode";
+
+// ✅ Fuera del componente — sobrevive los remounts de StrictMode
+let globalScanner = null;
+let isStarting = false;
 
 export default function QRScanner({ onResult }) {
-    const videoRef = useRef(null);
-    const startedRef = useRef(false);
-
-    const [status, setStatus] = useState("Iniciando cámara…");
-    const [error, setError] = useState("");
+    const onResultRef = useRef(onResult);
+    onResultRef.current = onResult; // siempre actualizado sin re-trigger del effect
 
     useEffect(() => {
-        console.log('🔵 QRScanner useEffect ejecutándose');
+        // Si ya hay un scanner activo o está iniciando, no hacer nada
+        if (globalScanner || isStarting) return;
+        isStarting = true;
 
-        // En dev, StrictMode monta/desmonta y corre effects 2 veces: evita doble inicio
-        if (startedRef.current) {
-            console.log('⚠️ QRScanner ya iniciado, evitando doble inicio');
-            return;
-        }
-        startedRef.current = true;
+        const scanner = new Html5Qrcode("qr-reader");
 
-        const reader = new BrowserMultiFormatReader();
-        let cancelled = false;
-        let controlsRef = null;
+        Html5Qrcode.getCameras()
+            .then((devices) => {
+                if (!devices.length) throw new Error("No se encontró cámara");
 
-        console.log('🔵 Iniciando scanner...');
+                const cam =
+                    devices.find((d) => /back|rear|environment/i.test(d.label)) ||
+                    devices[devices.length - 1];
 
-        (async () => {
-            try {
-                console.log('🔵 Listando dispositivos de video...');
-                const devices = await BrowserMultiFormatReader.listVideoInputDevices();
-                console.log('🔵 Dispositivos encontrados:', devices);
-
-                if (!devices || devices.length === 0) {
-                    throw new Error("No se detectó ninguna cámara en este dispositivo.");
-                }
-
-                setStatus("Escaneando…");
-                console.log('🔵 Iniciando decodificación desde cámara...');
-
-                controlsRef = await reader.decodeFromVideoDevice(
-                    devices[0].deviceId,
-                    videoRef.current,
-                    (result, err) => {
-                        if (cancelled) return;
-                        if (result) {
-                            console.log('✅ QR decodificado:', result.getText());
-                            onResult?.(result.getText());
-                        }
-                        if (err && err.name !== 'NotFoundException') {
-                            console.error('❌ Error durante decodificación:', err);
-                        }
-                    }
+                return scanner.start(
+                    cam.id,
+                    { fps: 10, qrbox: { width: 250, height: 250 } },
+                    (text) => onResultRef.current?.(text),
+                    () => { }
                 );
-                console.log('🔵 Scanner activo y escaneando');
-            } catch (e) {
-                console.error('❌ Error al iniciar scanner:', e);
-                if (cancelled) return;
-                setError(e?.message || "No se pudo iniciar la cámara.");
-                setStatus("");
-            }
-        })();
+            })
+            .then(() => {
+                globalScanner = scanner;
+                isStarting = false;
+            })
+            .catch((err) => {
+                console.error("QR Scanner error:", err);
+                isStarting = false;
+            });
 
         return () => {
-            console.log('🔴 QRScanner cleanup ejecutándose');
-            cancelled = true;
-
-            // Detener el stream de video
-            if (videoRef.current && videoRef.current.srcObject) {
-                const stream = videoRef.current.srcObject;
-                const tracks = stream.getTracks();
-                tracks.forEach(track => {
-                    console.log('🔴 Deteniendo track:', track.kind);
-                    track.stop();
-                });
-                videoRef.current.srcObject = null;
-            }
-
-            // Si el reader tiene método stopContinuousDecode, úsalo
-            if (controlsRef && typeof controlsRef.stop === 'function') {
-                console.log('🔴 Llamando controls.stop()');
-                controlsRef.stop();
+            // Cleanup real — solo cuando navegas fuera, no en StrictMode remount
+            if (globalScanner) {
+                globalScanner
+                    .stop()
+                    .catch(() => { })
+                    .finally(() => {
+                        globalScanner = null;
+                        isStarting = false;
+                    });
             }
         };
-    }, [onResult]);
+    }, []); // ✅ sin dependencias — el ref mantiene onResult actualizado
 
     return (
-        <div style={{ display: "grid", gap: 12, justifyItems: "center" }}>
-            {status && <div>{status}</div>}
-
-            {error ? (
-                <div style={{
-                    padding: 20,
-                    border: "1px solid #535353",
-                    borderRadius: 12,
-                    backgroundColor: '#1a1a1a',
-                    maxWidth: 420,
-                    width: '100%'
-                }}>
-                    <b>Scanner no disponible</b>
-                    <div style={{ marginTop: 6 }}>{error}</div>
-                    <div style={{ marginTop: 12, fontSize: 12, opacity: 0.7 }}>
-                        Prueba en tu teléfono abriendo la app por la IP de tu PC (Vite con <code>--host</code>).
-                    </div>
-                </div>
-            ) : (
-                <video
-                    ref={videoRef}
-                    autoPlay
-                    playsInline
-                    muted
-                    style={{
-                        width: "100%",
-                        maxWidth: 420,
-                        borderRadius: 12,
-                        border: "2px solid #535353",
-                        boxShadow: '0 4px 12px rgba(0,0,0,0.3)'
-                    }}
-                />
-            )}
-        </div>
+        <div
+            id="qr-reader"
+            style={{ width: "100%", maxWidth: 400, margin: "0 auto" }}
+        />
     );
 }
