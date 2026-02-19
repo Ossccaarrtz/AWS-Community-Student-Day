@@ -45,6 +45,7 @@ def pdf_dummy(req: PdfReq):
 @app.post("/badge")
 def badge(req: TicketReq):
     ticket_id = (req.ticketId or "").strip()
+    print(f"[DEBUG /badge] raw='{req.ticketId}' | stripped='{ticket_id}' | len={len(ticket_id)} | repr={repr(ticket_id)}")
     if not ticket_id:
         raise HTTPException(status_code=400, detail="ticketId requerido")
 
@@ -54,6 +55,7 @@ def badge(req: TicketReq):
         msg = e.response.get("Error", {}).get("Message", "DynamoDB ClientError")
         raise HTTPException(status_code=500, detail=msg)
 
+    print(f"[DEBUG /badge] DynamoDB item={item}")
     if not item:
         raise HTTPException(status_code=404, detail="ticketId no encontrado")
 
