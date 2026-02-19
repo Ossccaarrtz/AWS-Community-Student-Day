@@ -8,6 +8,40 @@ const API_URL = import.meta.env.VITE_API_URL;
 // ─── Constantes de anti-duplicado ─────────────────────────────────────────────
 const COOLDOWN_MS = 2000;
 
+/**
+ * Extrae el ticketId del texto crudo del QR.
+ * Soporta:
+ *   - Texto plano:  "TKT-2026-MKVIV4CK-D9C4FB27"
+ *   - URL path:     "https://example.com/checkin/TKT-2026-MKVIV4CK-D9C4FB27"
+ *   - URL query:    "https://example.com/?ticketId=TKT-2026-MKVIV4CK-D9C4FB27"
+ *   - JSON:         '{"ticketId":"TKT-2026-MKVIV4CK-D9C4FB27"}'
+ */
+function extractTicketId(raw) {
+    const text = String(raw || "").trim();
+    if (!text) return null;
+
+    // 1. Intentar parsear como JSON
+    try {
+        const obj = JSON.parse(text);
+        const val = obj?.ticketId || obj?.ticket_id || obj?.id;
+        if (val) return String(val).trim();
+    } catch (_) { /* no es JSON */ }
+
+    // 2. Intentar parsear como URL
+    try {
+        const url = new URL(text);
+        // Primero: query param ?ticketId=...
+        const qp = url.searchParams.get("ticketId") || url.searchParams.get("ticket_id");
+        if (qp) return qp.trim();
+        // Segundo: último segmento del path
+        const segments = url.pathname.split("/").filter(Boolean);
+        if (segments.length) return segments[segments.length - 1].trim();
+    } catch (_) { /* no es URL válida */ }
+
+    // 3. Texto plano: devolver tal cual
+    return text;
+}
+
 export default function CheckInPage() {
     // null | "loading" | "confirm" | "error"
     const [modalMode, setModalMode] = useState(null);
@@ -105,28 +139,29 @@ export default function CheckInPage() {
 
     // ── Callback para QRScanner ───────────────────────────────────────────────
     const handleScan = useCallback((decodedText) => {
-        const text = String(decodedText || "").trim();
-        if (!text) return;
+        // Debug: ver qué contiene el QR exactamente
+        console.log("[QR raw]", JSON.stringify(decodedText));
+
+        const ticketId = extractTicketId(decodedText);
+        console.log("[QR extracted ticketId]", ticketId);
+
+        if (!ticketId) return;
 
         const now = Date.now();
 
         // Anti-duplicado: lock activo (loading/modal/cooldown)
         if (lockRef.current) return;
 
-        // Anti-duplicado: mismo ID en ventana de 2 s
-        if (text === lastIdRef.current && now - lastTimeRef.current < COOLDOWN_MS) return;
+        // Anti-duplicado: mismo ticketId en ventana de 2 s
+        if (ticketId === lastIdRef.current && now - lastTimeRef.current < COOLDOWN_MS) return;
 
         // Adquirir lock
         lockRef.current = true;
-        lastIdRef.current = text;
+        lastIdRef.current = ticketId;
         lastTimeRef.current = now;
 
-        // Iniciar petición
-        fetchBadge(text);
-
-        // Cooldown de seguridad: aunque el modal se cierre antes de 2 s,
-        // no se podrá re-escanear el mismo ID por 2 s extra.
-        // (El lock real se libera en reset(), que solo se llama al cerrar el modal.)
+        // Iniciar petición con el ID limpio
+        fetchBadge(ticketId);
     }, [fetchBadge]);
 
     // ── Handlers modal ────────────────────────────────────────────────────────
