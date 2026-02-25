@@ -21,8 +21,12 @@ export default function QRScanner({ onResult }) {
                 if (!devices.length) throw new Error("No se encontró cámara");
 
                 const cam =
-                    devices.find((d) => /back|rear|environment/i.test(d.label)) ||
-                    devices[devices.length - 1];
+  // 1) Preferir integrada
+  devices.find(d => /integrated|hd webcam|webcam|camera/i.test(d.label)) ||
+  // 2) Si existiera una trasera (en laptop casi nunca)
+  devices.find(d => /back|rear|environment/i.test(d.label)) ||
+  // 3) Fallback: la primera (no la última)
+  devices[0];
 
                 return scanner.start(
                     cam.id,
