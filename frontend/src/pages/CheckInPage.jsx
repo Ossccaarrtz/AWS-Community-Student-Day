@@ -3,7 +3,7 @@ import QRScanner from "../components/qr/QRScanner";
 import ConfirmModal from "../components/ConfirmModal";
 import { downloadPdfFromBase64 } from "../utils/pdfUtils";
 
-const API_URL = import.meta.env.VITE_API_URL;
+const API_URL = "/api";
 
 // ─── Constantes de anti-duplicado ─────────────────────────────────────────────
 const COOLDOWN_MS = 2000;
@@ -183,7 +183,7 @@ export default function CheckInPage() {
     // ── Render ────────────────────────────────────────────────────────────────
     return (
         <div style={{ padding: "20px", fontFamily: "sans-serif", textAlign: "center" }}>
-            <h1>Kiosco de Gafetes</h1>
+            <h1>Scanner de QR</h1>
 
             <p style={{ color: "#555" }}>
                 {modalMode ? "Procesando…" : "Acerca el código QR de tu ticket a la cámara"}
