@@ -16,6 +16,13 @@ export default defineConfig({
     hmr: {
       clientPort: 443,
       protocol: 'wss'
+    },
+    proxy: {
+      '/api': {
+        target: 'http://localhost:8000',
+        changeOrigin: true,
+        rewrite: (path) => path.replace(/^\/api/, '')
+      }
     }
   }
 })

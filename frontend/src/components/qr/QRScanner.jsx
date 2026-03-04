@@ -20,20 +20,33 @@ export default function QRScanner({ onResult }) {
             .then((devices) => {
                 if (!devices.length) throw new Error("No se encontró cámara");
 
-                const cam =
-  // 1) Preferir integrada
-  devices.find(d => /integrated|hd webcam|webcam|camera/i.test(d.label)) ||
-  // 2) Si existiera una trasera (en laptop casi nunca)
-  devices.find(d => /back|rear|environment/i.test(d.label)) ||
-  // 3) Fallback: la primera (no la última)
-  devices[0];
-
+                // 1) Intentar primero con facingMode "environment" (cámara trasera en móvil)
                 return scanner.start(
-                    cam.id,
+                    { facingMode: { exact: "environment" } },
                     { fps: 10, qrbox: { width: 250, height: 250 } },
                     (text) => onResultRef.current?.(text),
                     () => { }
-                );
+                ).catch(() => {
+                    // 2) Si no soporta facingMode exacto, intentar con "environment" sin exact
+                    return scanner.start(
+                        { facingMode: "environment" },
+                        { fps: 10, qrbox: { width: 250, height: 250 } },
+                        (text) => onResultRef.current?.(text),
+                        () => { }
+                    ).catch(() => {
+                        // 3) Fallback por ID: buscar trasera, luego webcam integrada, luego la primera
+                        const cam =
+                            devices.find(d => /back|rear|environment/i.test(d.label)) ||
+                            devices.find(d => /integrated|hd webcam|webcam|camera/i.test(d.label)) ||
+                            devices[0];
+                        return scanner.start(
+                            cam.id,
+                            { fps: 10, qrbox: { width: 250, height: 250 } },
+                            (text) => onResultRef.current?.(text),
+                            () => { }
+                        );
+                    });
+                });
             })
             .then(() => {
                 globalScanner = scanner;

@@ -12,7 +12,7 @@ export default function BadgePreviewPage() {
     const lastScannedTime = useRef(0);
     const lastScannedId = useRef(null);
 
-    const API_URL = import.meta.env.VITE_API_URL;
+    const API_URL = "/api";
 
     console.log("Render BadgePreviewPage. State:", { scannedTicketId, loading, error, cooldown });
 
