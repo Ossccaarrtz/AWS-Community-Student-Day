@@ -1,6 +1,8 @@
 import { useState, useRef, useEffect, useCallback } from "react";
 import QRScanner from "../components/qr/QRScanner";
 import ConfirmModal from "../components/ConfirmModal";
+import CameraSelector from "../components/CameraSelector";
+import useCameraDevices from "../hooks/useCameraDevices";
 import { downloadPdfFromBase64 } from "../utils/pdfUtils";
 
 const API_URL = "/api";
@@ -43,6 +45,16 @@ function extractTicketId(raw) {
 }
 
 export default function CheckInPage() {
+    // ── Cámaras ───────────────────────────────────────────────────────────
+    const {
+        cameras,
+        selectedId,
+        setSelectedId,
+        permissionDenied,
+        noCameras,
+        retryPermission,
+    } = useCameraDevices();
+
     // null | "loading" | "confirm" | "error"
     const [modalMode, setModalMode] = useState(null);
     const [modalData, setModalData] = useState(null); // { name, pdfBase64, ticketId }
@@ -189,8 +201,18 @@ export default function CheckInPage() {
                 {modalMode ? "Procesando…" : "Acerca el código QR de tu ticket a la cámara"}
             </p>
 
+            {/* Selector de cámara */}
+            <CameraSelector
+                cameras={cameras}
+                selectedId={selectedId}
+                onSelect={setSelectedId}
+                permissionDenied={permissionDenied}
+                noCameras={noCameras}
+                onRetry={retryPermission}
+            />
+
             {/* El scanner siempre está montado; onResult se mantiene actualizado por ref */}
-            <QRScanner onResult={handleScan} />
+            <QRScanner onResult={handleScan} deviceId={selectedId} />
 
             {/* Modal superpuesto */}
             {modalMode && (
