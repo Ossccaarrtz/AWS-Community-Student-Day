@@ -13,6 +13,7 @@ load_dotenv()
 from repositories.event_users_repo import EventUsersRepo
 from utils.pdf_badge import build_badge_pdf
 from db.dynamo import TABLE_NAME, AWS_REGION
+from printer import printer_router, rt420me_router
 
 TICKET_GSI = os.getenv("TICKET_GSI_NAME", "TicketIdIndex")
 
@@ -25,6 +26,9 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+app.include_router(printer_router)
+app.include_router(rt420me_router)
 
 class PdfReq(BaseModel):
     id: str
